@@ -19,10 +19,7 @@ OUTPUT_ROOT = "/home/servidor/ArtigoLightglue/mass_results"
 JSON_DIR = os.path.join(OUTPUT_ROOT, "jsons")
 os.makedirs(JSON_DIR, exist_ok=True)
 
-# Ultralytics nativos (usam run_single_track.py com .yaml)
-TRACKERS_ULT = ["botsort", "bytetrack"]
-# boxmot (usam run_single_track_boxmot.py)
-TRACKERS_BOXMOT = ["strongsort", "ocsort", "deepocsort", "hybridsort", "boosttrack"]
+TRACKERS = ["botsort", "bytetrack"]
 STRIDES = {"30fps": 1, "5fps": 6, "1fps": 30}
 
 def run_baselines():
@@ -32,34 +29,20 @@ def run_baselines():
         if not os.path.exists(v_path): continue
         v_name = os.path.basename(v_path).split('.')[0]
         
-        all_trackers = [(t, "ultralytics") for t in TRACKERS_ULT] + \
-                       [(t, "boxmot") for t in TRACKERS_BOXMOT]
-        
-        for t_name, source in all_trackers:
+        for t_name in TRACKERS:
             for fps_label, stride in STRIDES.items():
                 name_key = f"{v_name}_{t_name}_{fps_label}"
                 print(f"Running Baseline: {name_key}...")
                 
-                if source == "ultralytics":
-                    cmd = [
-                        "python3", "/home/servidor/ArtigoLightglue/run_single_track.py",
-                        "--video", v_path,
-                        "--model", "/home/servidor/ArtigoLightglue/detector_placa.pt",
-                        "--tracker", f"/home/servidor/ArtigoLightglue/{t_name}.yaml",
-                        "--stride", str(stride),
-                        "--name", name_key,
-                        "--device", "0"
-                    ]
-                else:  # boxmot
-                    cmd = [
-                        "python3", "/home/servidor/ArtigoLightglue/run_single_track_boxmot.py",
-                        "--video", v_path,
-                        "--model", "/home/servidor/ArtigoLightglue/detector_placa.pt",
-                        "--tracker", t_name,
-                        "--stride", str(stride),
-                        "--name", name_key,
-                        "--device", "0"
-                    ]
+                cmd = [
+                    "python3", "/home/servidor/ArtigoLightglue/run_single_track.py",
+                    "--video", v_path,
+                    "--model", "/home/servidor/ArtigoLightglue/detector_placa.pt",
+                    "--tracker", f"/home/servidor/ArtigoLightglue/{t_name}.yaml",
+                    "--stride", str(stride),
+                    "--name", name_key,
+                    "--device", "0"
+                ]
                 subprocess.run(cmd, env={**os.environ, "CUDA_VISIBLE_DEVICES": "0"})
                 
                 # Ler o JSON gerado pelo run_single_track para pegar stats
