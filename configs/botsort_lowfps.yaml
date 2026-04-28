@@ -1,0 +1,12 @@
+# botsort_lowfps.yaml
+tracker_type: botsort
+track_high_thresh: 0.1
+track_low_thresh: 0.05
+new_track_thresh: 0.1
+track_buffer: 5
+match_thresh: 0.9
+fuse_score: True
+gmc_method: none # Desabilitado para baixo FPS
+proximity_thresh: 0.5
+appearance_thresh: 0.8
+with_reid: False

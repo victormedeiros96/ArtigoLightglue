@@ -1,0 +1,8 @@
+# bytetrack_lowfps.yaml
+tracker_type: bytetrack
+track_high_thresh: 0.1
+track_low_thresh: 0.05
+new_track_thresh: 0.1
+track_buffer: 5
+match_thresh: 0.9
+fuse_score: True
