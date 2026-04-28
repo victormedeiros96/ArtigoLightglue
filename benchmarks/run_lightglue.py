@@ -36,7 +36,7 @@ def run_experiment_on_video(video_path):
     results_summary = []
     
     # Diferentes taxas de amostragem
-    for fps_target in [30, 5, 1]:
+    for fps_target in [30, 5]:
         stride = 30 // fps_target
         cap = cv2.VideoCapture(video_path)
         

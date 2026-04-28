@@ -20,7 +20,7 @@ JSON_DIR = os.path.join(OUTPUT_ROOT, "jsons")
 os.makedirs(JSON_DIR, exist_ok=True)
 
 TRACKERS = ["botsort", "bytetrack"]
-STRIDES = {"30fps": 1, "5fps": 6, "1fps": 30}
+STRIDES = {"30fps": 1, "5fps": 6}
 
 def run_baselines():
     all_stats = []

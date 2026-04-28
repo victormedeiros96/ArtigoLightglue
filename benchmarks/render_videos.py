@@ -79,7 +79,7 @@ def render_json_on_video(video_path, json_path, output_path, fps_target):
 def main():
     for v_path in VIDEOS:
         v_id = os.path.basename(v_path).split('.')[0]
-        for fps in [30, 5, 1]:
+        for fps in [30, 5]:
             json_file = f"{JSON_DIR}/{v_id}_lg_{fps}fps.json"
             out_file = f"{OUT_DIR}/{v_id}_COMPARATIVO_{fps}fps.mp4"
             if not os.path.exists(out_file): # Evitar re-renderizar o que já está pronto
