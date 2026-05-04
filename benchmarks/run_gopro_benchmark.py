@@ -87,7 +87,7 @@ def main():
     bot_args = load_tracker_args("/mnt/hd2/ArtigoLightglue/configs/botsort.yaml")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    strides = [15, 6, 1] # 2 FPS, 5 FPS, 30 FPS
+    strides = [15] # 2 FPS, 5 FPS, 30 FPS
     stats = []
     
     mh = mm.metrics.create()
@@ -134,7 +134,7 @@ def main():
                 motion_weight=0.3,
                 max_age=30, 
                 roadside_mode=True, # Active constraints!
-                use_cmc=False # CMC is turned off as requested previously to focus on roadside geometry
+                use_cmc=False # Enabled to compensate for camera vibration/shake
             )
             
             byte_results = []

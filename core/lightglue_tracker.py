@@ -123,9 +123,8 @@ class LightGlueTracker:
         
         matched_detect_indices, active_results = set(), []
         
-        # Gate espacial: cap em 500px independente do stride
-        # (evita que 200*stride=1200px a 5fps cruce metade da imagem)
-        max_spatial_dist = min(200 * stride, 500)
+        # Gate espacial: aumentado para 1500px para lidar com grandes saltos em 2 FPS (carro em movimento)
+        max_spatial_dist = min(200 * stride, 1500)
         half_W = W / 2
         center_tolerance = 120  # px de tolerância ao redor do centro
         if self.tracks and det_features:
