@@ -1,24 +1,21 @@
-# Vídeos e Proxies (Arquivos Pesados)
-*.mp4
-*.MP4
+# Datasets e imagens (PESADOS)
+Datasets_externos/
+results/
 proxies/
-mass_results/videos/
+videos/
+*.MP4
+*.mp4
+*.zip
+*.tar
+*.gz
 
-# Python Cache
+# Logs e arquivos temporários
+*.log
+logs/
 __pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
+*.pyc
 
-# Ambientes / IDE
-.venv
-venv/
-env/
-.env
-.idea/
-.vscode/
-
-# Jupyter / Checkpoints
-.ipynb_checkpoints/
-
-# Obs: Pesos dos modelos (.pt) estão intencionalmente permitidos.
+# Pesos de modelos
+*.pt
+*.onnx
+*.engine
