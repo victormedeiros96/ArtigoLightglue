@@ -46,5 +46,6 @@ Os arquivos `.txt` no formato MOT15 podem ser lidos para plotar curvas de perfor
 ## 4. Análise de Comportamento
 
 1. **Resiliência Visual:** O BoTSORT e ByteTrack dependem fortemente de IoU (proximidade espacial) e Filtro de Kalman. Quando o FPS cai, o deslocamento do objeto entre frames supera o limite do IoU, causando perda total de rastreamento.
-2. **Superioridade Geométrica:** O LightGlue utiliza correspondência de pontos-chave (`keypoint matching`), o que permite reencontrar o objeto mesmo que ele tenha se deslocado centenas de pixels entre um frame e outro.
-3. **Ponto Crítico:** O ganho é muito maior na GoPro (700%) do que no GOT-10k (8%) porque na GoPro o movimento é puramente translacional e rápido (veículos), onde o LightGlue brilha ao lidar com grandes saltos espaciais.
+2. **Superioridade Geométrica:** O LightGlue utiliza correspondência de pontos-chave (`keypoint matching`) via SuperPoint, o que permite reencontrar o objeto mesmo que ele tenha se deslocado centenas de pixels entre um frame e outro.
+3. **Compensação de Movimento (CMC):** Implementamos uma camada de *Global Camera Motion Compensation* (CMC) dentro do LightGlueTracker. Diferente dos baselines que usam ORB ou ECC, nós utilizamos as próprias correspondências do LightGlue para estimar a homografia/deslocamento da câmera, garantindo que o rastreamento seja estável mesmo com *ego-motion* agressivo (comum no GOT-10k).
+4. **Ponto Crítico:** O ganho é muito maior na GoPro (700%) do que no GOT-10k (8%) porque na GoPro o movimento é puramente translacional e rápido (veículos), onde o LightGlue brilha ao lidar com grandes saltos espaciais. No GOT-10k, a diversidade de movimentos e o CMC ajudam a manter a liderança em baixos FPS.
