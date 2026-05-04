@@ -21,8 +21,10 @@ class Track:
         self.radial_dist = np.linalg.norm(self.center - self.img_center)
 
 class LightGlueTracker:
-    def __init__(self, device='cuda', accept_th=1.2, motion_weight=0.5, max_age=5, min_matches_short=15, min_matches_global=30, verbose=False):
+    def __init__(self, device='cuda', accept_th=1.2, motion_weight=0.5, max_age=5, min_matches_short=15, min_matches_global=30, verbose=False, roadside_mode=True, use_cmc=False):
         self.device = device
+        self.roadside_mode = roadside_mode
+        self.use_cmc = use_cmc
         # Rigor de Inventário: Apenas 5 frames de tolerância em 30fps (0.16s)
         self.max_age_frames = max_age 
         self.min_matches_short = min_matches_short
@@ -36,6 +38,8 @@ class LightGlueTracker:
         self.gallery = {}
         self.match_stats = []
         self.img_center = np.array([960, 540])
+        self.prev_frame = None
+        self.cmc_offset = np.array([0.0, 0.0])
         
         # SuperPoint calibrado para 1024 pontos para cobrir o contexto ampliado
         self.extractor = SuperPoint(max_num_keypoints=1024).eval().to(device)
@@ -88,9 +92,18 @@ class LightGlueTracker:
         # Escala da tolerância de apagão baseada no FPS alvo (stride)
         allowed_gap = max(1, 5 // stride) # Ex: 30fps permite 5 frames, 5fps permite 1 frame.
         self.age_tracks(allowed_gap)
+
+        if len(bboxes) == 0: 
+            self.prev_frame = frame.copy()
+            return []
         
-        if len(bboxes) == 0: return []
         H, W = frame.shape[:2]
+
+        # --- CAMERA MOTION COMPENSATION (CMC) ---
+        if self.use_cmc and self.prev_frame is not None and self.tracks:
+            self.apply_cmc(frame)
+        
+        self.prev_frame = frame.copy()
         
         # CLIPPING GUARD RÍGIDO (Detectou corte na borda = descarta)
         valid_indices = []
@@ -122,7 +135,7 @@ class LightGlueTracker:
                     if classes[d_idx] != trk.cls: continue
                     
                     # Lei Radial: objeto estático só se afasta do centro
-                    if det_radial_dists[d_idx] < trk.radial_dist - 30: continue
+                    if self.roadside_mode and det_radial_dists[d_idx] < trk.radial_dist - 30: continue
                     
                     # Gate Euclidiano: rejeita se longe demais
                     dist = np.linalg.norm(det_centers[d_idx] - trk.center)
@@ -130,14 +143,15 @@ class LightGlueTracker:
                     
                     # Guarda Esquerda/Direita: placa não teleporta entre lados
                     # Só bloqueia se AMBOS estiverem longe do centro (fora da zona de tolerância)
-                    det_x = det_centers[d_idx][0]
-                    trk_x = trk.center[0]
-                    det_near_center = abs(det_x - half_W) < center_tolerance
-                    trk_near_center = abs(trk_x - half_W) < center_tolerance
-                    det_left = det_x < half_W
-                    trk_left = trk_x < half_W
-                    if (det_left != trk_left) and not det_near_center and not trk_near_center:
-                        continue  # Lados opostos, ambos longe do centro = impossível
+                    if self.roadside_mode:
+                        det_x = det_centers[d_idx][0]
+                        trk_x = trk.center[0]
+                        det_near_center = abs(det_x - half_W) < center_tolerance
+                        trk_near_center = abs(trk_x - half_W) < center_tolerance
+                        det_left = det_x < half_W
+                        trk_left = trk_x < half_W
+                        if (det_left != trk_left) and not det_near_center and not trk_near_center:
+                            continue  # Lados opostos, ambos longe do centro = impossível
                     
                     valid_pairs.append((d_idx, t_idx))
             
@@ -192,3 +206,52 @@ class LightGlueTracker:
             trk = self.tracks.popleft()
             # Guardamos na galeria mas não usamos para ReID automático agressivo por enquanto
             self.gallery[trk.id].update({"center": trk.center, "frame": trk.last_frame, "velocity": trk.velocity, "radial_dist": trk.radial_dist})
+
+    def apply_cmc(self, curr_frame):
+        """Estima o movimento da câmera usando LightGlue nos crops dos tracks ativos"""
+        if not self.tracks: return
+        
+        # Selecionamos até 3 tracks ativos para estimar o movimento global
+        active_tracks = [t for t in self.tracks if t.age == 0][:3]
+        if not active_tracks: return
+
+        displacements = []
+        for trk in active_tracks:
+            # Crop do frame anterior (já guardado na feature do track) vs crop na mesma posição no frame atual
+            prev_img = self.get_ultra_context_crop(self.prev_frame, trk.bbox)
+            curr_img = self.get_ultra_context_crop(curr_frame, trk.bbox)
+            
+            t0 = numpy_image_to_torch(prev_img).to(self.device).float()
+            t1 = numpy_image_to_torch(curr_img).to(self.device).float()
+            
+            with torch.no_grad():
+                f0 = self.extractor.extract(t0)
+                f1 = self.extractor.extract(t1)
+                matches = self.matcher({'image0': f0, 'image1': f1})
+                
+                m0 = f0['keypoints'][0][matches['matches0'][0] > -1].cpu().numpy()
+                m1 = f1['keypoints'][0][matches['matches0'][0][matches['matches0'][0] > -1]].cpu().numpy()
+                
+                if len(m0) > 10:
+                    # O deslocamento do crop (320x320) precisa ser escalado de volta para a imagem original
+                    # Fator de escala = (factor * box_w) / 320
+                    x1, y1, x2, y2 = trk.bbox
+                    scale_x = (5.0 * (x2 - x1)) / 320.0
+                    scale_y = (5.0 * (y2 - y1)) / 320.0
+                    
+                    diff = (m1 - m0) * np.array([scale_x, scale_y])
+                    displacements.append(np.median(diff, axis=0))
+
+        if displacements:
+            global_shift = np.median(displacements, axis=0)
+            if self.verbose: print(f"CMC Global Shift: {global_shift}")
+            
+            # Aplica o deslocamento inverso nos tracks (traz o passado para o presente da câmera)
+            for trk in self.tracks:
+                trk.center += global_shift
+                trk.bbox[0] += global_shift[0]
+                trk.bbox[2] += global_shift[0]
+                trk.bbox[1] += global_shift[1]
+                trk.bbox[3] += global_shift[1]
+                # Atualiza a distância radial após o CMC
+                trk.radial_dist = np.linalg.norm(trk.center - self.img_center)
